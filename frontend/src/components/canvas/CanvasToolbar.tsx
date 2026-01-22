@@ -49,8 +49,9 @@ export function CanvasToolbar() {
 
     try {
       await executeWorkflow();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Execution error:', error);
+      alert(`실행 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     }
   };
 

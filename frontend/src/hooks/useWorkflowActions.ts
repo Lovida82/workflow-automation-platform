@@ -163,6 +163,7 @@ export function useWorkflowActions() {
 function topologicalSort(nodes: any[], edges: any[]): any[] {
   const inDegree: Record<string, number> = {};
   const graph: Record<string, string[]> = {};
+  const nodeIds = new Set(nodes.map(n => n.id));
 
   // 초기화
   nodes.forEach((node) => {
@@ -170,10 +171,13 @@ function topologicalSort(nodes: any[], edges: any[]): any[] {
     graph[node.id] = [];
   });
 
-  // 그래프 구축
+  // 그래프 구축 (유효한 엣지만 처리)
   edges.forEach((edge) => {
-    graph[edge.source].push(edge.target);
-    inDegree[edge.target]++;
+    // 소스와 타겟 노드가 모두 존재하는 경우에만 처리
+    if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+      graph[edge.source].push(edge.target);
+      inDegree[edge.target]++;
+    }
   });
 
   // 진입 차수가 0인 노드부터 시작
@@ -187,8 +191,10 @@ function topologicalSort(nodes: any[], edges: any[]): any[] {
     graph[node.id].forEach((neighborId) => {
       inDegree[neighborId]--;
       if (inDegree[neighborId] === 0) {
-        const neighbor = nodes.find((n) => n.id === neighborId)!;
-        queue.push(neighbor);
+        const neighbor = nodes.find((n) => n.id === neighborId);
+        if (neighbor) {
+          queue.push(neighbor);
+        }
       }
     });
   }
@@ -196,10 +202,28 @@ function topologicalSort(nodes: any[], edges: any[]): any[] {
   return sorted;
 }
 
+// 이전 결과에서 배열 데이터 추출 (안전하게)
+function getPreviousData(previousResults: Record<string, any>): any[] {
+  try {
+    const values = Object.values(previousResults);
+    if (values.length === 0) return [];
+
+    // 배열이면 flat, 아니면 그대로 배열에 넣기
+    return values.flatMap(v => {
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === 'object' && 'data' in v && Array.isArray(v.data)) return v.data;
+      if (v !== null && v !== undefined) return [v];
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
 // 노드 실행
 async function simulateNodeExecution(node: any, previousResults: Record<string, any>): Promise<any> {
   const nodeType = node.data.nodeType;
-  const config = node.data.config;
+  const config = node.data.config || {};
 
   switch (nodeType) {
     case 'naver_news_search':
@@ -235,18 +259,19 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
       }
 
     case 'gpt_sentiment':
-      const inputData = Object.values(previousResults).flat();
+      const inputData = getPreviousData(previousResults);
       return inputData.map((item: any) => ({
-        ...item,
+        ...(typeof item === 'object' ? item : {}),
         sentiment: ['positive', 'negative', 'neutral'][Math.floor(Math.random() * 3)],
         confidence: Math.random() * 0.5 + 0.5,
       }));
 
     case 'filter':
-      const data = Object.values(previousResults).flat();
-      return data.filter((item: any) => {
+      const filterData = getPreviousData(previousResults);
+      return filterData.filter((item: any) => {
+        if (!item || typeof item !== 'object') return false;
         const fieldValue = String(item[config.field] || '');
-        const filterValue = String(config.value);
+        const filterValue = String(config.value || '');
 
         switch (config.operator) {
           case 'contains':
@@ -259,9 +284,10 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
       });
 
     case 'group_by':
-      const items = Object.values(previousResults).flat();
+      const groupItems = getPreviousData(previousResults);
       const grouped: Record<string, any[]> = {};
-      items.forEach((item: any) => {
+      groupItems.forEach((item: any) => {
+        if (!item || typeof item !== 'object') return;
         const key = item[config.groupField] || 'unknown';
         if (!grouped[key]) grouped[key] = [];
         grouped[key].push(item);
@@ -284,7 +310,7 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
     case 'line_chart':
     case 'bar_chart':
     case 'wordcloud':
-      const chartData = Object.values(previousResults).flat();
+      const chartData = getPreviousData(previousResults);
       return {
         type: nodeType.replace('_', '-'),
         data: chartData,
@@ -294,7 +320,7 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
     case 'data_table':
       return {
         type: 'table',
-        data: Object.values(previousResults).flat(),
+        data: getPreviousData(previousResults),
         columns: config.columns || [],
       };
 

@@ -175,7 +175,13 @@ export function NodeConfigPanel() {
             </div>
             <div className="p-3 bg-slate-50 rounded-lg overflow-auto max-h-40">
               <pre className="text-xs text-slate-600">
-                {JSON.stringify(selectedNode.data.result, null, 2)}
+                {(() => {
+                  try {
+                    return JSON.stringify(selectedNode.data.result, null, 2);
+                  } catch {
+                    return '결과를 표시할 수 없습니다.';
+                  }
+                })()}
               </pre>
             </div>
           </div>
