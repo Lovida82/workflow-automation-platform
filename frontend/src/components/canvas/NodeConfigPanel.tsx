@@ -1,10 +1,13 @@
 // 노드 설정 패널 (우측 사이드바)
-import { X, Trash2, Settings, Info } from 'lucide-react';
+import { useState } from 'react';
+import { X, Trash2, Settings, Info, Maximize2 } from 'lucide-react';
 import { NODE_REGISTRY, CATEGORY_COLORS } from '../../lib/nodes/registry';
 import { useWorkflowStore } from '../../store/workflowStore';
+import { ResultsModal } from './ResultsModal';
 
 export function NodeConfigPanel() {
   const { nodes, selectedNodeId, selectNode, updateNodeConfig, deleteNode } = useWorkflowStore();
+  const [showResultsModal, setShowResultsModal] = useState(false);
 
   // 선택된 노드 찾기
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
@@ -160,7 +163,16 @@ export function NodeConfigPanel() {
         {/* 노드 결과 (있는 경우) */}
         {selectedNode.data.result && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-slate-700 mb-2">실행 결과</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium text-slate-700">실행 결과</h4>
+              <button
+                onClick={() => setShowResultsModal(true)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              >
+                <Maximize2 className="w-3 h-3" />
+                크게 보기
+              </button>
+            </div>
             <div className="p-3 bg-slate-50 rounded-lg overflow-auto max-h-40">
               <pre className="text-xs text-slate-600">
                 {JSON.stringify(selectedNode.data.result, null, 2)}
@@ -169,6 +181,14 @@ export function NodeConfigPanel() {
           </div>
         )}
       </div>
+
+      {/* 결과 모달 */}
+      <ResultsModal
+        isOpen={showResultsModal}
+        onClose={() => setShowResultsModal(false)}
+        title={nodeDef.displayName}
+        data={selectedNode.data.result}
+      />
 
       {/* 하단 액션 */}
       <div className="p-4 border-t border-slate-200 space-y-2">
