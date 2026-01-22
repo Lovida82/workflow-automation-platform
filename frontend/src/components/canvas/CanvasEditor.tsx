@@ -40,7 +40,7 @@ function CanvasEditorInner() {
     nodes,
     edges,
     selectedNodeId,
-    isExecuting,
+    showExecutionPanel,
     onNodesChange,
     onEdgesChange,
     onConnect,
@@ -137,7 +137,7 @@ function CanvasEditorInner() {
           </ReactFlow>
 
           {/* 실행 패널 */}
-          {isExecuting && <ExecutionPanel />}
+          {showExecutionPanel && <ExecutionPanel />}
 
           {/* 빈 캔버스 안내 */}
           {nodes.length === 0 && (

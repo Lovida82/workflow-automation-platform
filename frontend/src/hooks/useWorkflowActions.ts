@@ -31,6 +31,7 @@ export function useWorkflowActions() {
     updateNodeStatus,
     updateNodeResult,
     resetExecution,
+    setShowExecutionPanel,
   } = useWorkflowStore();
 
   // 워크플로우 저장
@@ -90,6 +91,7 @@ export function useWorkflowActions() {
 
     resetExecution();
     setExecuting(true);
+    setShowExecutionPanel(true); // 실행 패널 표시
     const executionId = uuidv4();
     setExecutionId(executionId);
 
@@ -146,6 +148,7 @@ export function useWorkflowActions() {
     setExecutionId,
     updateNodeStatus,
     updateNodeResult,
+    setShowExecutionPanel,
   ]);
 
   return {

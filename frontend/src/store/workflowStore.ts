@@ -31,6 +31,7 @@ interface WorkflowState {
   executionId: string | null;
   nodeStatuses: Record<string, 'idle' | 'running' | 'success' | 'error'>;
   nodeResults: Record<string, any>;
+  showExecutionPanel: boolean; // 실행 패널 표시 여부
 
   // 액션
   setWorkflow: (id: string, name: string, description: string, nodes: Node[], edges: Edge[]) => void;
@@ -50,6 +51,7 @@ interface WorkflowState {
   updateNodeStatus: (nodeId: string, status: 'idle' | 'running' | 'success' | 'error') => void;
   updateNodeResult: (nodeId: string, result: any) => void;
   resetExecution: () => void;
+  setShowExecutionPanel: (show: boolean) => void;
 }
 
 export const useWorkflowStore = create<WorkflowState>((set) => ({
@@ -64,6 +66,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
   executionId: null,
   nodeStatuses: {},
   nodeResults: {},
+  showExecutionPanel: false,
 
   // 워크플로우 설정
   setWorkflow: (id, name, description, nodes, edges) =>
@@ -172,9 +175,12 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
       executionId: null,
       nodeStatuses: {},
       nodeResults: {},
+      showExecutionPanel: false,
       nodes: state.nodes.map((node) => ({
         ...node,
         data: { ...node.data, status: 'idle', result: undefined },
       })),
     })),
+
+  setShowExecutionPanel: (show) => set({ showExecutionPanel: show }),
 }));

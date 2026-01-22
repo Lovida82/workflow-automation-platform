@@ -56,7 +56,7 @@ export function NodeConfigPanel() {
             <textarea
               value={value}
               onChange={(e) => handleConfigChange(key, e.target.value)}
-              placeholder={schema.description}
+              placeholder={schema.placeholder || schema.description}
               rows={4}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
@@ -67,7 +67,7 @@ export function NodeConfigPanel() {
             type="text"
             value={value}
             onChange={(e) => handleConfigChange(key, e.target.value)}
-            placeholder={schema.description}
+            placeholder={schema.placeholder || ''}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         );
