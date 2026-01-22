@@ -1,10 +1,12 @@
 // 노드 설정 패널 (우측 사이드바)
 import { useState, useMemo } from 'react';
-import { X, Trash2, Settings, Info, Maximize2, ChevronDown } from 'lucide-react';
+import { X, Trash2, Settings, Info, Maximize2, ChevronDown, Play, Loader2 } from 'lucide-react';
 import { NODE_REGISTRY, CATEGORY_COLORS } from '../../lib/nodes/registry';
 import { useWorkflowStore } from '../../store/workflowStore';
+import { useWorkflowActions } from '../../hooks/useWorkflowActions';
 import { ResultsModal } from './ResultsModal';
 import { FileUploadNode } from './FileUploadNode';
+import { ChartRenderer } from './ChartRenderer';
 
 // 필드 선택이 필요한 설정 키들
 const FIELD_SELECT_KEYS = [
@@ -14,7 +16,10 @@ const FIELD_SELECT_KEYS = [
 
 export function NodeConfigPanel() {
   const { nodes, edges, selectedNodeId, selectNode, updateNodeConfig, deleteNode, updateNodeData } = useWorkflowStore();
+  const { executeSingleNode } = useWorkflowActions();
   const [showResultsModal, setShowResultsModal] = useState(false);
+  const [isNodeExecuting, setIsNodeExecuting] = useState(false);
+  const [executeError, setExecuteError] = useState<string | null>(null);
 
   // 선택된 노드 찾기
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
@@ -91,6 +96,19 @@ export function NodeConfigPanel() {
   const handleDelete = () => {
     if (confirm('이 노드를 삭제하시겠습니까?')) {
       deleteNode(selectedNode.id);
+    }
+  };
+
+  // 노드 개별 실행
+  const handleExecuteNode = async () => {
+    setIsNodeExecuting(true);
+    setExecuteError(null);
+    try {
+      await executeSingleNode(selectedNode.id);
+    } catch (error: any) {
+      setExecuteError(error.message || '노드 실행 중 오류가 발생했습니다.');
+    } finally {
+      setIsNodeExecuting(false);
     }
   };
 
@@ -294,17 +312,28 @@ export function NodeConfigPanel() {
                 크게 보기
               </button>
             </div>
-            <div className="p-3 bg-slate-50 rounded-lg overflow-auto max-h-40">
-              <pre className="text-xs text-slate-600">
-                {(() => {
-                  try {
-                    return JSON.stringify(selectedNode.data.result, null, 2);
-                  } catch {
-                    return '결과를 표시할 수 없습니다.';
-                  }
-                })()}
-              </pre>
-            </div>
+            {/* 차트 데이터인 경우 차트로 렌더링 */}
+            {selectedNode.data.result?.type && ['line-chart', 'bar-chart', 'wordcloud'].includes(selectedNode.data.result.type) ? (
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <ChartRenderer
+                  type={selectedNode.data.result.type}
+                  data={selectedNode.data.result.data || []}
+                  config={selectedNode.data.result.config || {}}
+                />
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-lg overflow-auto max-h-40">
+                <pre className="text-xs text-slate-600">
+                  {(() => {
+                    try {
+                      return JSON.stringify(selectedNode.data.result, null, 2);
+                    } catch {
+                      return '결과를 표시할 수 없습니다.';
+                    }
+                  })()}
+                </pre>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -327,10 +356,34 @@ export function NodeConfigPanel() {
           </div>
         )}
 
+        {/* 실행 에러 표시 */}
+        {executeError && (
+          <div className="p-2 bg-red-50 border border-red-200 rounded-lg mb-2">
+            <p className="text-xs text-red-600">{executeError}</p>
+          </div>
+        )}
+
         <div className="flex gap-2">
           <button
+            onClick={handleExecuteNode}
+            disabled={isNodeExecuting}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
+          >
+            {isNodeExecuting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                실행 중...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                실행
+              </>
+            )}
+          </button>
+          <button
             onClick={handleDelete}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
             삭제

@@ -157,9 +157,64 @@ export function useWorkflowActions() {
     setShowExecutionPanel,
   ]);
 
+  // 단일 노드 실행
+  const executeSingleNode = useCallback(async (nodeId: string) => {
+    if (!user) throw new Error('로그인이 필요합니다.');
+
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) throw new Error('노드를 찾을 수 없습니다.');
+
+    // 현재 노드만 실행 상태로 변경
+    updateNodeStatus(nodeId, 'running');
+
+    try {
+      // 연결된 입력 노드들의 기존 결과 수집
+      const { nodeResults } = useWorkflowStore.getState();
+      const connectedResults = getConnectedInputs(nodeId, edges, nodeResults);
+
+      // 연결된 입력 노드 중 결과가 없는 노드 확인
+      const incomingEdges = edges.filter(edge => edge.target === nodeId);
+      const missingInputs: string[] = [];
+
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        if (!sourceNode) continue;
+
+        // 입력 노드(csv_upload, excel_upload)는 uploadedData 확인
+        if (sourceNode.data.nodeType === 'csv_upload' || sourceNode.data.nodeType === 'excel_upload') {
+          if (!sourceNode.data.uploadedData) {
+            missingInputs.push(sourceNode.data.label || sourceNode.data.nodeType);
+          } else if (!(edge.source in connectedResults)) {
+            // uploadedData가 있으면 결과로 추가
+            connectedResults[edge.source] = sourceNode.data.uploadedData;
+          }
+        } else if (!(edge.source in connectedResults)) {
+          missingInputs.push(sourceNode.data.label || sourceNode.data.nodeType);
+        }
+      }
+
+      if (missingInputs.length > 0) {
+        throw new Error(`이전 노드를 먼저 실행해주세요: ${missingInputs.join(', ')}`);
+      }
+
+      // 노드 실행
+      const result = await simulateNodeExecution(node, connectedResults);
+
+      // 결과 업데이트
+      updateNodeResult(nodeId, result);
+      updateNodeStatus(nodeId, 'success');
+
+      return result;
+    } catch (error: any) {
+      updateNodeStatus(nodeId, 'error');
+      throw error;
+    }
+  }, [user, nodes, edges, updateNodeStatus, updateNodeResult]);
+
   return {
     saveWorkflow,
     executeWorkflow,
+    executeSingleNode,
     isSaving,
     isExecuting,
   };

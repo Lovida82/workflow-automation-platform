@@ -1,5 +1,5 @@
 // 실행 결과 모달 (큰 테이블 형태로 표시)
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Download, ChevronLeft, ChevronRight, Maximize2, Table, Code, BarChart3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ChartRenderer } from './ChartRenderer';
@@ -16,11 +16,21 @@ export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 10;
 
-  if (!isOpen) return null;
-
   // 차트 데이터인지 확인
   const isChartData = data && typeof data === 'object' && !Array.isArray(data) &&
     ('type' in data) && ['line-chart', 'bar-chart', 'wordcloud'].includes(data.type);
+
+  // 데이터가 변경되면 적절한 뷰 모드로 자동 전환
+  useEffect(() => {
+    if (isChartData) {
+      setViewMode('chart');
+    } else {
+      setViewMode('table');
+    }
+    setCurrentPage(0);
+  }, [data, isChartData]);
+
+  if (!isOpen) return null;
 
   // 데이터가 없는 경우 처리
   if (data === null || data === undefined) {
