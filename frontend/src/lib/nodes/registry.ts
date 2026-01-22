@@ -339,26 +339,6 @@ export const NODE_REGISTRY: Record<string, NodeDefinition> = {
     averageRuntime: 50,
   },
 
-  docx_report: {
-    type: 'docx_report',
-    category: 'output',
-    displayName: 'DOCX 리포트',
-    icon: 'FileText',
-    description: 'Word 문서 형태의 리포트 생성 (.docx)',
-    inputs: [{ id: 'content', label: '리포트 내용', type: 'any', required: true }],
-    outputs: [{ id: 'file', label: '생성된 파일', type: 'file', required: true }],
-    configSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', title: '리포트 제목', description: '문서 상단에 표시될 제목', required: true, placeholder: '예: AI 뉴스 분석 리포트' },
-        template: { type: 'string', title: '템플릿', description: 'basic=간단, detailed=상세', enum: ['basic', 'detailed'], enumNames: ['기본 템플릿', '상세 템플릿'], default: 'basic' },
-      },
-    },
-    defaultConfig: { title: '', template: 'basic' },
-    isPremium: false,
-    averageRuntime: 1000,
-  },
-
   email_send: {
     type: 'email_send',
     category: 'output',
@@ -418,6 +398,67 @@ export const NODE_REGISTRY: Record<string, NodeDefinition> = {
     defaultConfig: { fileName: 'output.xlsx', sheetName: 'Sheet1' },
     isPremium: false,
     averageRuntime: 300,
+  },
+
+  txt_save: {
+    type: 'txt_save',
+    category: 'output',
+    displayName: 'TXT 저장',
+    icon: 'FileText',
+    description: '텍스트를 TXT 파일로 다운로드. GPT 생성 보고서 저장에 적합',
+    inputs: [{ id: 'text', label: '텍스트 데이터', type: 'string', required: true }],
+    outputs: [{ id: 'file', label: '생성된 파일', type: 'file', required: true }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        fileName: { type: 'string', title: '파일명', description: '저장할 파일 이름', default: 'report.txt', placeholder: '보고서.txt' },
+      },
+    },
+    defaultConfig: { fileName: 'report.txt' },
+    isPremium: false,
+    averageRuntime: 100,
+  },
+
+  markdown_save: {
+    type: 'markdown_save',
+    category: 'output',
+    displayName: 'Markdown 저장',
+    icon: 'FileCode',
+    description: '텍스트를 Markdown 파일(.md)로 다운로드. 서식 있는 보고서 저장',
+    inputs: [{ id: 'text', label: '텍스트 데이터', type: 'string', required: true }],
+    outputs: [{ id: 'file', label: '생성된 파일', type: 'file', required: true }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        fileName: { type: 'string', title: '파일명', description: '저장할 파일 이름', default: 'report.md', placeholder: '보고서.md' },
+        addTitle: { type: 'boolean', title: '제목 추가', description: '파일 상단에 제목 추가', default: true },
+        title: { type: 'string', title: '문서 제목', description: '문서 상단에 표시할 제목', default: '분석 보고서', placeholder: 'AI 분석 리포트' },
+      },
+    },
+    defaultConfig: { fileName: 'report.md', addTitle: true, title: '분석 보고서' },
+    isPremium: false,
+    averageRuntime: 100,
+  },
+
+  docx_save: {
+    type: 'docx_save',
+    category: 'output',
+    displayName: 'DOCX 저장',
+    icon: 'FileText',
+    description: 'Word 문서(.docx)로 다운로드. 정식 보고서 형태',
+    inputs: [{ id: 'text', label: '텍스트 데이터', type: 'string', required: true }],
+    outputs: [{ id: 'file', label: '생성된 파일', type: 'file', required: true }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        fileName: { type: 'string', title: '파일명', description: '저장할 파일 이름', default: 'report.docx', placeholder: '보고서.docx' },
+        title: { type: 'string', title: '문서 제목', description: '문서 상단에 표시할 제목', default: '분석 보고서', placeholder: 'AI 분석 리포트' },
+        author: { type: 'string', title: '작성자', description: '문서 작성자 이름', default: '', placeholder: '홍길동' },
+      },
+    },
+    defaultConfig: { fileName: 'report.docx', title: '분석 보고서', author: '' },
+    isPremium: false,
+    averageRuntime: 500,
   },
 };
 
