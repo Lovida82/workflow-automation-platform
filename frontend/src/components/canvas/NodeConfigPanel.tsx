@@ -18,15 +18,11 @@ export function NodeConfigPanel() {
 
   // 선택된 노드 찾기
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
-  if (!selectedNode) return null;
 
-  const nodeDef = NODE_REGISTRY[selectedNode.data.nodeType];
-  if (!nodeDef) return null;
-
-  const color = CATEGORY_COLORS[nodeDef.category];
-
-  // 이전 노드들의 데이터에서 사용 가능한 컬럼 추출
+  // 이전 노드들의 데이터에서 사용 가능한 컬럼 추출 (hooks는 조건부 return 전에 호출)
   const availableColumns = useMemo(() => {
+    if (!selectedNode) return [];
+
     const columns: string[] = [];
 
     // 현재 노드로 들어오는 엣지 찾기
@@ -71,7 +67,15 @@ export function NodeConfigPanel() {
     }
 
     return columns;
-  }, [selectedNode.id, edges, nodes]);
+  }, [selectedNode?.id, edges, nodes]);
+
+  // 조건부 return (hooks 이후에)
+  if (!selectedNode) return null;
+
+  const nodeDef = NODE_REGISTRY[selectedNode.data.nodeType];
+  if (!nodeDef) return null;
+
+  const color = CATEGORY_COLORS[nodeDef.category];
 
   // 설정 값 변경 핸들러
   const handleConfigChange = (key: string, value: any) => {
