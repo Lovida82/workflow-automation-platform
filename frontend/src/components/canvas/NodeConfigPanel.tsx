@@ -4,9 +4,10 @@ import { X, Trash2, Settings, Info, Maximize2 } from 'lucide-react';
 import { NODE_REGISTRY, CATEGORY_COLORS } from '../../lib/nodes/registry';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { ResultsModal } from './ResultsModal';
+import { FileUploadNode } from './FileUploadNode';
 
 export function NodeConfigPanel() {
-  const { nodes, selectedNodeId, selectNode, updateNodeConfig, deleteNode } = useWorkflowStore();
+  const { nodes, selectedNodeId, selectNode, updateNodeConfig, deleteNode, updateNodeData } = useWorkflowStore();
   const [showResultsModal, setShowResultsModal] = useState(false);
 
   // 선택된 노드 찾기
@@ -21,6 +22,11 @@ export function NodeConfigPanel() {
   // 설정 값 변경 핸들러
   const handleConfigChange = (key: string, value: any) => {
     updateNodeConfig(selectedNode.id, { [key]: value });
+  };
+
+  // 파일 업로드 데이터 처리
+  const handleFileDataLoaded = (data: any[]) => {
+    updateNodeData(selectedNode.id, { uploadedData: data });
   };
 
   // 노드 삭제
@@ -159,6 +165,26 @@ export function NodeConfigPanel() {
               {renderConfigField(key, schema)}
             </div>
           ))}
+
+        {/* 파일 업로드 (CSV/Excel 노드) */}
+        {(selectedNode.data.nodeType === 'csv_upload' || selectedNode.data.nodeType === 'excel_upload') && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              파일 업로드
+            </label>
+            <FileUploadNode
+              nodeId={selectedNode.id}
+              nodeType={selectedNode.data.nodeType}
+              config={selectedNode.data.config}
+              onDataLoaded={handleFileDataLoaded}
+            />
+            {selectedNode.data.uploadedData && (
+              <p className="text-xs text-green-600 mt-2">
+                {selectedNode.data.uploadedData.length}개 행이 로드되었습니다.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* 노드 결과 (있는 경우) */}
         {selectedNode.data.result && (

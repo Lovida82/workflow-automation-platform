@@ -45,11 +45,16 @@ export function useWorkflowActions() {
         name: workflowName,
         description: workflowDescription,
         category: 'general',
+        status: 'draft',
         nodes: nodes.map((n) => ({
           id: n.id,
           type: n.type,
           position: n.position,
-          data: n.data,
+          data: {
+            nodeType: n.data.nodeType,
+            label: n.data.label,
+            config: n.data.config,
+          },
         })),
         edges: edges.map((e) => ({
           id: e.id,
@@ -226,6 +231,15 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
   const config = node.data.config || {};
 
   switch (nodeType) {
+    case 'csv_upload':
+    case 'excel_upload':
+      // 업로드된 데이터 반환
+      const uploadedData = node.data.uploadedData;
+      if (!uploadedData || uploadedData.length === 0) {
+        throw new Error('파일을 먼저 업로드해주세요.');
+      }
+      return uploadedData;
+
     case 'naver_news_search':
       // 실제 네이버 뉴스 API 호출
       try {
@@ -299,13 +313,10 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
       }));
 
     case 'keyword_extract':
-      return [
-        { word: config.textField, count: 15 },
-        { word: '키워드1', count: 12 },
-        { word: '키워드2', count: 10 },
-        { word: '키워드3', count: 8 },
-        { word: '키워드4', count: 5 },
-      ];
+      const textData = getPreviousData(previousResults);
+      const textField = config.textField || 'description';
+      const topK = config.topK || 10;
+      return extractKeywords(textData, textField, topK);
 
     case 'line_chart':
     case 'bar_chart':
@@ -324,7 +335,134 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
         columns: config.columns || [],
       };
 
+    case 'csv_save':
+      const csvData = getPreviousData(previousResults);
+      if (csvData.length === 0) {
+        throw new Error('저장할 데이터가 없습니다.');
+      }
+      downloadCSV(csvData, config.fileName || 'output.csv', config.delimiter || ',');
+      return { message: 'CSV 파일이 다운로드되었습니다.', rowCount: csvData.length };
+
+    case 'excel_save':
+      const excelData = getPreviousData(previousResults);
+      if (excelData.length === 0) {
+        throw new Error('저장할 데이터가 없습니다.');
+      }
+      downloadExcel(excelData, config.fileName || 'output.xlsx', config.sheetName || 'Sheet1');
+      return { message: 'Excel 파일이 다운로드되었습니다.', rowCount: excelData.length };
+
     default:
       return { message: `${nodeType} 노드 실행 완료`, data: previousResults };
   }
+}
+
+// 키워드 추출 함수 (단어 빈도 분석)
+function extractKeywords(data: any[], textField: string, topK: number): { word: string; count: number }[] {
+  // 불용어 (제거할 단어들)
+  const stopWords = new Set([
+    '의', '가', '이', '은', '는', '을', '를', '에', '에서', '와', '과', '도', '로', '으로',
+    '에게', '한', '하다', '있다', '되다', '이다', '그', '저', '것', '수', '등', '및',
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+    'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought', 'used',
+    'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as', 'into',
+    'through', 'during', 'before', 'after', 'above', 'below', 'between',
+    'and', 'but', 'or', 'nor', 'so', 'yet', 'both', 'either', 'neither',
+    'not', 'only', 'own', 'same', 'than', 'too', 'very', 'just',
+    'about', 'also', 'back', 'been', 'being', 'even', 'first', 'get',
+    'got', 'go', 'going', 'gone', 'good', 'great', 'here', 'how',
+    'if', 'into', 'its', 'just', 'know', 'last', 'like', 'look',
+    'make', 'many', 'more', 'most', 'much', 'new', 'no', 'now',
+    'old', 'one', 'only', 'other', 'our', 'out', 'over', 'own',
+    'said', 'say', 'see', 'she', 'some', 'such', 'take', 'tell',
+    'that', 'their', 'them', 'then', 'there', 'these', 'they', 'this',
+    'those', 'time', 'two', 'up', 'use', 'very', 'want', 'way',
+    'we', 'well', 'what', 'when', 'where', 'which', 'while', 'who',
+    'why', 'will', 'with', 'work', 'would', 'year', 'you', 'your',
+  ]);
+
+  const wordCounts: Record<string, number> = {};
+
+  // HTML 태그 제거 함수
+  const stripHtml = (html: string) => {
+    return html.replace(/<[^>]*>/g, ' ').replace(/&[^;]+;/g, ' ');
+  };
+
+  // 모든 텍스트 수집 및 단어 카운트
+  data.forEach(item => {
+    if (!item || typeof item !== 'object') return;
+    const text = item[textField];
+    if (!text || typeof text !== 'string') return;
+
+    // HTML 태그 제거 및 정규화
+    const cleanText = stripHtml(text)
+      .toLowerCase()
+      .replace(/[^\w\sㄱ-ㅎ가-힣]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // 단어 분리 및 카운트
+    const words = cleanText.split(' ').filter(word =>
+      word.length >= 2 &&
+      !stopWords.has(word) &&
+      !/^\d+$/.test(word)
+    );
+
+    words.forEach(word => {
+      wordCounts[word] = (wordCounts[word] || 0) + 1;
+    });
+  });
+
+  // 상위 K개 단어 추출
+  const sortedWords = Object.entries(wordCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topK)
+    .map(([word, count]) => ({ word, count }));
+
+  return sortedWords;
+}
+
+// CSV 다운로드 함수
+function downloadCSV(data: any[], fileName: string, delimiter: string) {
+  if (data.length === 0) return;
+
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(delimiter),
+    ...data.map(row =>
+      headers.map(header => {
+        const value = row[header];
+        const strValue = value === null || value === undefined ? '' :
+          typeof value === 'object' ? JSON.stringify(value) : String(value);
+        // 구분자나 줄바꿈이 포함된 경우 따옴표로 감싸기
+        if (strValue.includes(delimiter) || strValue.includes('\n') || strValue.includes('"')) {
+          return `"${strValue.replace(/"/g, '""')}"`;
+        }
+        return strValue;
+      }).join(delimiter)
+    )
+  ].join('\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Excel 다운로드 함수
+async function downloadExcel(data: any[], fileName: string, sheetName: string) {
+  // 동적으로 xlsx 라이브러리 임포트
+  const XLSX = await import('xlsx');
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+  // 파일 다운로드
+  XLSX.writeFile(workbook, fileName);
 }

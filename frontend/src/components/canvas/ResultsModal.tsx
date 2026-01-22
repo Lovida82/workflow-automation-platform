@@ -1,7 +1,8 @@
 // 실행 결과 모달 (큰 테이블 형태로 표시)
 import { useState } from 'react';
-import { X, Download, ChevronLeft, ChevronRight, Maximize2, Table, Code } from 'lucide-react';
+import { X, Download, ChevronLeft, ChevronRight, Maximize2, Table, Code, BarChart3 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ChartRenderer } from './ChartRenderer';
 
 interface ResultsModalProps {
   isOpen: boolean;
@@ -11,11 +12,15 @@ interface ResultsModalProps {
 }
 
 export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps) {
-  const [viewMode, setViewMode] = useState<'table' | 'json'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'json' | 'chart'>('table');
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 10;
 
   if (!isOpen) return null;
+
+  // 차트 데이터인지 확인
+  const isChartData = data && typeof data === 'object' && !Array.isArray(data) &&
+    ('type' in data) && ['line-chart', 'bar-chart', 'wordcloud'].includes(data.type);
 
   // 데이터가 없는 경우 처리
   if (data === null || data === undefined) {
@@ -121,6 +126,18 @@ export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps
                 <Table className="w-4 h-4" />
                 테이블
               </button>
+              {isChartData && (
+                <button
+                  onClick={() => setViewMode('chart')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors',
+                    viewMode === 'chart' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'
+                  )}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  차트
+                </button>
+              )}
               <button
                 onClick={() => setViewMode('json')}
                 className={cn(
@@ -154,7 +171,17 @@ export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps
 
         {/* 컨텐츠 */}
         <div className="flex-1 overflow-auto p-6">
-          {viewMode === 'table' ? (
+          {viewMode === 'chart' && isChartData ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-full max-w-4xl">
+                <ChartRenderer
+                  type={data.type}
+                  data={data.data || []}
+                  config={data.config || {}}
+                />
+              </div>
+            </div>
+          ) : viewMode === 'table' ? (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>

@@ -42,6 +42,7 @@ interface WorkflowState {
   onConnect: (connection: Connection) => void;
   addNode: (type: string, position: { x: number; y: number }) => void;
   updateNodeConfig: (nodeId: string, config: Record<string, any>) => void;
+  updateNodeData: (nodeId: string, data: Record<string, any>) => void;
   deleteNode: (nodeId: string) => void;
   selectNode: (nodeId: string | null) => void;
 
@@ -134,6 +135,16 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
       nodes: state.nodes.map((node) =>
         node.id === nodeId
           ? { ...node, data: { ...node.data, config: { ...node.data.config, ...config } } }
+          : node
+      ),
+    })),
+
+  // 노드 데이터 업데이트 (업로드된 파일 데이터 등)
+  updateNodeData: (nodeId, data) =>
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, ...data } }
           : node
       ),
     })),
