@@ -124,8 +124,9 @@ export function useWorkflowActions() {
           // 시뮬레이션 딜레이
           await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000));
 
-          // 노드 실행 결과 시뮬레이션
-          const result = await simulateNodeExecution(node, results);
+          // 노드 실행 결과 시뮬레이션 (연결된 노드의 결과만 전달)
+          const connectedResults = getConnectedInputs(node.id, edges, results);
+          const result = await simulateNodeExecution(node, connectedResults);
           results[node.id] = result;
 
           updateNodeResult(node.id, result);
@@ -162,6 +163,24 @@ export function useWorkflowActions() {
     isSaving,
     isExecuting,
   };
+}
+
+// 연결된 입력 노드의 결과만 가져오기
+function getConnectedInputs(nodeId: string, edges: any[], allResults: Record<string, any>): Record<string, any> {
+  const connectedResults: Record<string, any> = {};
+
+  // 현재 노드로 들어오는 엣지 찾기
+  const incomingEdges = edges.filter(edge => edge.target === nodeId);
+
+  // 연결된 소스 노드의 결과만 가져오기
+  for (const edge of incomingEdges) {
+    const sourceId = edge.source;
+    if (sourceId in allResults) {
+      connectedResults[sourceId] = allResults[sourceId];
+    }
+  }
+
+  return connectedResults;
 }
 
 // 토폴로지 정렬
