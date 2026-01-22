@@ -266,6 +266,50 @@ app.delete('/tasks/:id', authenticate, async (req, res) => {
   }
 });
 
+// ============ Naver API ============
+
+// Naver News Search
+app.post('/naver/news', authenticate, async (req, res) => {
+  try {
+    const { query, display = 10, start = 1, sort = 'date' } = req.body;
+
+    if (!query) {
+      res.status(400).json({ error: 'Query is required' });
+      return;
+    }
+
+    const clientId = functions.config().naver?.client_id;
+    const clientSecret = functions.config().naver?.client_secret;
+
+    if (!clientId || !clientSecret) {
+      res.status(500).json({ error: 'Naver API credentials not configured' });
+      return;
+    }
+
+    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=${display}&start=${start}&sort=${sort}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'X-Naver-Client-Id': clientId,
+        'X-Naver-Client-Secret': clientSecret,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Naver API error:', errorText);
+      res.status(response.status).json({ error: 'Naver API request failed' });
+      return;
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Error searching Naver news:', error);
+    res.status(500).json({ error: 'Failed to search news' });
+  }
+});
+
 // Export the Express app as a Cloud Function
 export const api = functions.https.onRequest(app);
 

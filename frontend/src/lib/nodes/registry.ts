@@ -46,6 +46,27 @@ export const NODE_REGISTRY: Record<string, NodeDefinition> = {
     averageRuntime: 500,
   },
 
+  excel_upload: {
+    type: 'excel_upload',
+    category: 'input',
+    displayName: 'Excel 업로드',
+    icon: 'FileSpreadsheet',
+    description: 'Excel 파일(.xlsx, .xls)을 업로드하여 데이터 가져오기',
+    inputs: [],
+    outputs: [{ id: 'data', label: '데이터', type: 'array', required: true }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        sheetName: { type: 'string', title: '시트명', description: '비워두면 첫 번째 시트 사용', default: '' },
+        hasHeader: { type: 'boolean', title: '헤더 포함', default: true },
+        startRow: { type: 'number', title: '시작 행', description: '데이터 시작 행 (1부터)', default: 1 },
+      },
+    },
+    defaultConfig: { sheetName: '', hasHeader: true, startRow: 1 },
+    isPremium: false,
+    averageRuntime: 800,
+  },
+
   naver_news_search: {
     type: 'naver_news_search',
     category: 'input',
@@ -369,6 +390,26 @@ export const NODE_REGISTRY: Record<string, NodeDefinition> = {
     defaultConfig: { fileName: 'output.csv', delimiter: ',' },
     isPremium: false,
     averageRuntime: 200,
+  },
+
+  excel_save: {
+    type: 'excel_save',
+    category: 'output',
+    displayName: 'Excel 저장',
+    icon: 'FileDown',
+    description: '데이터를 Excel 파일(.xlsx)로 저장',
+    inputs: [{ id: 'data', label: '저장할 데이터', type: 'array', required: true }],
+    outputs: [{ id: 'file', label: '생성된 파일', type: 'file', required: true }],
+    configSchema: {
+      type: 'object',
+      properties: {
+        fileName: { type: 'string', title: '파일명', default: 'output.xlsx' },
+        sheetName: { type: 'string', title: '시트명', default: 'Sheet1' },
+      },
+    },
+    defaultConfig: { fileName: 'output.xlsx', sheetName: 'Sheet1' },
+    isPremium: false,
+    averageRuntime: 300,
   },
 };
 
