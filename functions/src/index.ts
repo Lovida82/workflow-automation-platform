@@ -310,6 +310,156 @@ app.post('/naver/news', authenticate, async (req, res) => {
   }
 });
 
+// ============ OpenAI API ============
+
+// GPT 감성 분석
+app.post('/openai/sentiment', authenticate, async (req, res) => {
+  try {
+    const { items, textField = 'description', model = 'gpt-3.5-turbo' } = req.body;
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: 'Items array is required' });
+      return;
+    }
+
+    const apiKey = functions.config().openai?.api_key;
+    if (!apiKey) {
+      res.status(500).json({ error: 'OpenAI API key not configured' });
+      return;
+    }
+
+    // 각 아이템에 대해 감성 분석 수행
+    const results = await Promise.all(
+      items.slice(0, 20).map(async (item: any) => {
+        const text = item[textField] || '';
+        if (!text) {
+          return { ...item, sentiment: 'neutral', confidence: 0.5 };
+        }
+
+        try {
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a sentiment analysis assistant. Analyze the sentiment of the given text and respond with ONLY a JSON object in this exact format: {"sentiment": "positive" or "negative" or "neutral", "confidence": 0.0 to 1.0}. No other text.'
+                },
+                {
+                  role: 'user',
+                  content: text.substring(0, 500)
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 50,
+            }),
+          });
+
+          if (!response.ok) {
+            console.error('OpenAI API error:', await response.text());
+            return { ...item, sentiment: 'neutral', confidence: 0.5 };
+          }
+
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content || '';
+
+          try {
+            const parsed = JSON.parse(content);
+            return {
+              ...item,
+              sentiment: parsed.sentiment || 'neutral',
+              confidence: parsed.confidence || 0.5,
+            };
+          } catch {
+            // JSON 파싱 실패 시 텍스트에서 감성 추출
+            const lower = content.toLowerCase();
+            let sentiment = 'neutral';
+            if (lower.includes('positive')) sentiment = 'positive';
+            else if (lower.includes('negative')) sentiment = 'negative';
+            return { ...item, sentiment, confidence: 0.7 };
+          }
+        } catch (error) {
+          console.error('Sentiment analysis error:', error);
+          return { ...item, sentiment: 'neutral', confidence: 0.5 };
+        }
+      })
+    );
+
+    res.json({ results });
+  } catch (error) {
+    console.error('Error in sentiment analysis:', error);
+    res.status(500).json({ error: 'Failed to analyze sentiment' });
+  }
+});
+
+// GPT 텍스트 생성
+app.post('/openai/generate', authenticate, async (req, res) => {
+  try {
+    const { prompt, context, model = 'gpt-3.5-turbo', temperature = 0.7, maxTokens = 1000 } = req.body;
+
+    if (!prompt) {
+      res.status(400).json({ error: 'Prompt is required' });
+      return;
+    }
+
+    const apiKey = functions.config().openai?.api_key;
+    if (!apiKey) {
+      res.status(500).json({ error: 'OpenAI API key not configured' });
+      return;
+    }
+
+    // 컨텍스트가 있으면 프롬프트에 추가
+    let fullPrompt = prompt;
+    if (context) {
+      const contextStr = typeof context === 'string' ? context : JSON.stringify(context, null, 2);
+      fullPrompt = `Context:\n${contextStr.substring(0, 3000)}\n\nTask: ${prompt}`;
+    }
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'user',
+            content: fullPrompt
+          }
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      res.status(response.status).json({ error: 'OpenAI API request failed' });
+      return;
+    }
+
+    const data = await response.json();
+    const generatedText = data.choices?.[0]?.message?.content || '';
+
+    res.json({
+      text: generatedText,
+      model,
+      usage: data.usage
+    });
+  } catch (error) {
+    console.error('Error generating text:', error);
+    res.status(500).json({ error: 'Failed to generate text' });
+  }
+});
+
 // Export the Express app as a Cloud Function
 export const api = functions.https.onRequest(app);
 

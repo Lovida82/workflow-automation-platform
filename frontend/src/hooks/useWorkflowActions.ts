@@ -273,12 +273,79 @@ async function simulateNodeExecution(node: any, previousResults: Record<string, 
       }
 
     case 'gpt_sentiment':
-      const inputData = getPreviousData(previousResults);
-      return inputData.map((item: any) => ({
-        ...(typeof item === 'object' ? item : {}),
-        sentiment: ['positive', 'negative', 'neutral'][Math.floor(Math.random() * 3)],
-        confidence: Math.random() * 0.5 + 0.5,
-      }));
+      // 실제 OpenAI API 호출
+      try {
+        const sentimentToken = await auth.currentUser?.getIdToken();
+        if (!sentimentToken) throw new Error('인증 토큰을 가져올 수 없습니다.');
+
+        const sentimentData = getPreviousData(previousResults);
+        if (sentimentData.length === 0) {
+          throw new Error('분석할 데이터가 없습니다.');
+        }
+
+        const sentimentResponse = await fetch(`${API_BASE_URL}/openai/sentiment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sentimentToken}`,
+          },
+          body: JSON.stringify({
+            items: sentimentData,
+            textField: config.textField || 'description',
+            model: config.model || 'gpt-3.5-turbo',
+          }),
+        });
+
+        if (!sentimentResponse.ok) {
+          const errorData = await sentimentResponse.json();
+          throw new Error(errorData.error || 'GPT 감성 분석 실패');
+        }
+
+        const sentimentResult = await sentimentResponse.json();
+        return sentimentResult.results || [];
+      } catch (error: any) {
+        console.error('GPT Sentiment API error:', error);
+        throw new Error(`GPT 감성 분석 오류: ${error.message}`);
+      }
+
+    case 'gpt_text':
+      // 실제 OpenAI API 호출 - 텍스트 생성
+      try {
+        const gptToken = await auth.currentUser?.getIdToken();
+        if (!gptToken) throw new Error('인증 토큰을 가져올 수 없습니다.');
+
+        const contextData = getPreviousData(previousResults);
+
+        const gptResponse = await fetch(`${API_BASE_URL}/openai/generate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${gptToken}`,
+          },
+          body: JSON.stringify({
+            prompt: config.prompt || '데이터를 분석해주세요.',
+            context: contextData,
+            model: config.model || 'gpt-3.5-turbo',
+            temperature: config.temperature || 0.7,
+            maxTokens: config.maxTokens || 1000,
+          }),
+        });
+
+        if (!gptResponse.ok) {
+          const errorData = await gptResponse.json();
+          throw new Error(errorData.error || 'GPT 텍스트 생성 실패');
+        }
+
+        const gptResult = await gptResponse.json();
+        return {
+          text: gptResult.text,
+          model: gptResult.model,
+          usage: gptResult.usage,
+        };
+      } catch (error: any) {
+        console.error('GPT Text API error:', error);
+        throw new Error(`GPT 텍스트 생성 오류: ${error.message}`);
+      }
 
     case 'filter':
       const filterData = getPreviousData(previousResults);
