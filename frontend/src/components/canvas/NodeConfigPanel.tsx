@@ -1,6 +1,6 @@
 // 노드 설정 패널 (우측 사이드바)
 import { useState, useMemo } from 'react';
-import { X, Trash2, Settings, Info, Maximize2, ChevronDown, Play, Loader2 } from 'lucide-react';
+import { X, Trash2, Settings, Info, Maximize2, ChevronDown, Play, Loader2, Unlink, ArrowRight, ArrowLeft } from 'lucide-react';
 import { NODE_REGISTRY, CATEGORY_COLORS } from '../../lib/nodes/registry';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { useWorkflowActions } from '../../hooks/useWorkflowActions';
@@ -15,7 +15,7 @@ const FIELD_SELECT_KEYS = [
 ];
 
 export function NodeConfigPanel() {
-  const { nodes, edges, selectedNodeId, selectNode, updateNodeConfig, deleteNode, updateNodeData } = useWorkflowStore();
+  const { nodes, edges, selectedNodeId, selectNode, updateNodeConfig, deleteNode, deleteEdge, updateNodeData } = useWorkflowStore();
   const { executeSingleNode } = useWorkflowActions();
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [isNodeExecuting, setIsNodeExecuting] = useState(false);
@@ -72,6 +72,39 @@ export function NodeConfigPanel() {
     }
 
     return columns;
+  }, [selectedNode?.id, edges, nodes]);
+
+  // 연결된 노드 정보 (입력/출력)
+  const connectedNodes = useMemo(() => {
+    if (!selectedNode) return { incoming: [], outgoing: [] };
+
+    // 들어오는 연결 (이 노드가 target)
+    const incoming = edges
+      .filter(edge => edge.target === selectedNode.id)
+      .map(edge => {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        return {
+          edgeId: edge.id,
+          nodeId: edge.source,
+          nodeLabel: sourceNode?.data?.label || '알 수 없음',
+          nodeType: sourceNode?.data?.nodeType || '',
+        };
+      });
+
+    // 나가는 연결 (이 노드가 source)
+    const outgoing = edges
+      .filter(edge => edge.source === selectedNode.id)
+      .map(edge => {
+        const targetNode = nodes.find(n => n.id === edge.target);
+        return {
+          edgeId: edge.id,
+          nodeId: edge.target,
+          nodeLabel: targetNode?.data?.label || '알 수 없음',
+          nodeType: targetNode?.data?.nodeType || '',
+        };
+      });
+
+    return { incoming, outgoing };
   }, [selectedNode?.id, edges, nodes]);
 
   // 조건부 return (hooks 이후에)
@@ -261,6 +294,61 @@ export function NodeConfigPanel() {
           <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-blue-700">{nodeDef.description}</p>
         </div>
+
+        {/* 연결된 노드 목록 */}
+        {(connectedNodes.incoming.length > 0 || connectedNodes.outgoing.length > 0) && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-slate-700">연결된 노드</h4>
+
+            {/* 입력 연결 */}
+            {connectedNodes.incoming.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 flex items-center gap-1">
+                  <ArrowRight className="w-3 h-3" /> 입력
+                </p>
+                {connectedNodes.incoming.map((conn) => (
+                  <div
+                    key={conn.edgeId}
+                    className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                  >
+                    <span className="text-sm text-slate-700">{conn.nodeLabel}</span>
+                    <button
+                      onClick={() => deleteEdge(conn.edgeId)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="연결 끊기"
+                    >
+                      <Unlink className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 출력 연결 */}
+            {connectedNodes.outgoing.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500 flex items-center gap-1">
+                  <ArrowLeft className="w-3 h-3" /> 출력
+                </p>
+                {connectedNodes.outgoing.map((conn) => (
+                  <div
+                    key={conn.edgeId}
+                    className="flex items-center justify-between p-2 bg-slate-50 rounded-lg"
+                  >
+                    <span className="text-sm text-slate-700">{conn.nodeLabel}</span>
+                    <button
+                      onClick={() => deleteEdge(conn.edgeId)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="연결 끊기"
+                    >
+                      <Unlink className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 설정 필드들 */}
         {nodeDef.configSchema.properties &&

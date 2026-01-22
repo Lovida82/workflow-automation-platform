@@ -44,6 +44,7 @@ interface WorkflowState {
   updateNodeConfig: (nodeId: string, config: Record<string, any>) => void;
   updateNodeData: (nodeId: string, data: Record<string, any>) => void;
   deleteNode: (nodeId: string) => void;
+  deleteEdge: (edgeId: string) => void;
   selectNode: (nodeId: string | null) => void;
 
   // 실행 관련
@@ -155,6 +156,12 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
       nodes: state.nodes.filter((node) => node.id !== nodeId),
       edges: state.edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId),
       selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+    })),
+
+  // 엣지(연결) 삭제
+  deleteEdge: (edgeId) =>
+    set((state) => ({
+      edges: state.edges.filter((edge) => edge.id !== edgeId),
     })),
 
   // 노드 선택
