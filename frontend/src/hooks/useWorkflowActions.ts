@@ -8,9 +8,11 @@ import {
   addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import { useWorkflowStore } from '../store/workflowStore';
 import { useAuth } from './useAuth';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export function useWorkflowActions() {
   const { user } = useAuth();
@@ -191,33 +193,43 @@ function topologicalSort(nodes: any[], edges: any[]): any[] {
   return sorted;
 }
 
-// 노드 실행 시뮬레이션
+// 노드 실행
 async function simulateNodeExecution(node: any, previousResults: Record<string, any>): Promise<any> {
   const nodeType = node.data.nodeType;
   const config = node.data.config;
 
   switch (nodeType) {
     case 'naver_news_search':
-      return [
-        {
-          title: `${config.query} 관련 뉴스 1`,
-          description: '이것은 샘플 뉴스 기사입니다.',
-          pubDate: new Date().toISOString(),
-          link: 'https://example.com/news/1',
-        },
-        {
-          title: `${config.query} 관련 뉴스 2`,
-          description: '또 다른 샘플 뉴스 기사입니다.',
-          pubDate: new Date().toISOString(),
-          link: 'https://example.com/news/2',
-        },
-        {
-          title: `${config.query} 관련 뉴스 3`,
-          description: '세 번째 샘플 뉴스 기사입니다.',
-          pubDate: new Date().toISOString(),
-          link: 'https://example.com/news/3',
-        },
-      ];
+      // 실제 네이버 뉴스 API 호출
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('인증 토큰을 가져올 수 없습니다.');
+
+        const response = await fetch(`${API_BASE_URL}/naver/news`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            query: config.query,
+            display: config.display || 10,
+            sort: config.sort || 'sim',
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || '네이버 뉴스 검색 실패');
+        }
+
+        const data = await response.json();
+        // 네이버 API 응답 형식에서 items 추출
+        return data.items || [];
+      } catch (error: any) {
+        console.error('Naver News API error:', error);
+        throw new Error(`네이버 뉴스 검색 오류: ${error.message}`);
+      }
 
     case 'gpt_sentiment':
       const inputData = Object.values(previousResults).flat();
