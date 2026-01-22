@@ -17,14 +17,34 @@ export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps
 
   if (!isOpen) return null;
 
-  // 데이터를 배열로 변환
-  const dataArray = Array.isArray(data) ? data : [data];
-  const totalPages = Math.ceil(dataArray.length / pageSize);
+  // 데이터가 없는 경우 처리
+  if (data === null || data === undefined) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">결과 없음</h2>
+          <p className="text-slate-600 mb-4">실행 결과가 없습니다.</p>
+          <button
+            onClick={onClose}
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 데이터를 배열로 변환 (null/undefined 필터링)
+  const rawArray = Array.isArray(data) ? data : [data];
+  const dataArray = rawArray.filter(item => item !== null && item !== undefined);
+  const totalPages = Math.max(1, Math.ceil(dataArray.length / pageSize));
   const paginatedData = dataArray.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-  // 컬럼 추출 (첫 번째 아이템 기준)
-  const columns = dataArray.length > 0 && typeof dataArray[0] === 'object'
-    ? Object.keys(dataArray[0]).filter(key => key !== 'items')
+  // 컬럼 추출 (첫 번째 아이템 기준) - null 체크 추가
+  const firstItem = dataArray[0];
+  const columns = dataArray.length > 0 && firstItem && typeof firstItem === 'object'
+    ? Object.keys(firstItem).filter(key => key !== 'items')
     : [];
 
   // CSV 다운로드
@@ -57,15 +77,22 @@ export function ResultsModal({ isOpen, onClose, title, data }: ResultsModalProps
     return tmp.textContent || tmp.innerText || '';
   };
 
-  // 셀 값 렌더링
+  // 셀 값 렌더링 (에러 방지)
   const renderCellValue = (value: any) => {
-    if (value === null || value === undefined) return '-';
-    if (typeof value === 'boolean') return value ? '✓' : '✗';
-    if (typeof value === 'object') return JSON.stringify(value).substring(0, 50) + '...';
+    try {
+      if (value === null || value === undefined) return '-';
+      if (typeof value === 'boolean') return value ? '✓' : '✗';
+      if (typeof value === 'object') {
+        const jsonStr = JSON.stringify(value);
+        return jsonStr.length > 50 ? jsonStr.substring(0, 50) + '...' : jsonStr;
+      }
 
-    const strValue = String(value);
-    const cleanValue = strValue.includes('<') ? stripHtml(strValue) : strValue;
-    return cleanValue.length > 100 ? cleanValue.substring(0, 100) + '...' : cleanValue;
+      const strValue = String(value);
+      const cleanValue = strValue.includes('<') ? stripHtml(strValue) : strValue;
+      return cleanValue.length > 100 ? cleanValue.substring(0, 100) + '...' : cleanValue;
+    } catch (error) {
+      return '-';
+    }
   };
 
   return (
