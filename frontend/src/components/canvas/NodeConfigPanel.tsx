@@ -1,13 +1,19 @@
 // 노드 설정 패널 (우측 사이드바)
-import { useState } from 'react';
-import { X, Trash2, Settings, Info, Maximize2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Trash2, Settings, Info, Maximize2, ChevronDown } from 'lucide-react';
 import { NODE_REGISTRY, CATEGORY_COLORS } from '../../lib/nodes/registry';
 import { useWorkflowStore } from '../../store/workflowStore';
 import { ResultsModal } from './ResultsModal';
 import { FileUploadNode } from './FileUploadNode';
 
+// 필드 선택이 필요한 설정 키들
+const FIELD_SELECT_KEYS = [
+  'field', 'textField', 'groupField', 'valueField',
+  'xField', 'yField', 'categoryField', 'wordField', 'countField'
+];
+
 export function NodeConfigPanel() {
-  const { nodes, selectedNodeId, selectNode, updateNodeConfig, deleteNode, updateNodeData } = useWorkflowStore();
+  const { nodes, edges, selectedNodeId, selectNode, updateNodeConfig, deleteNode, updateNodeData } = useWorkflowStore();
   const [showResultsModal, setShowResultsModal] = useState(false);
 
   // 선택된 노드 찾기
@@ -18,6 +24,54 @@ export function NodeConfigPanel() {
   if (!nodeDef) return null;
 
   const color = CATEGORY_COLORS[nodeDef.category];
+
+  // 이전 노드들의 데이터에서 사용 가능한 컬럼 추출
+  const availableColumns = useMemo(() => {
+    const columns: string[] = [];
+
+    // 현재 노드로 들어오는 엣지 찾기
+    const incomingEdges = edges.filter(edge => edge.target === selectedNode.id);
+
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (!sourceNode) continue;
+
+      // 업로드된 데이터에서 컬럼 추출
+      if (sourceNode.data.uploadedData && Array.isArray(sourceNode.data.uploadedData) && sourceNode.data.uploadedData.length > 0) {
+        const firstRow = sourceNode.data.uploadedData[0];
+        if (firstRow && typeof firstRow === 'object') {
+          Object.keys(firstRow).forEach(key => {
+            if (!columns.includes(key)) columns.push(key);
+          });
+        }
+      }
+
+      // 실행 결과에서 컬럼 추출
+      if (sourceNode.data.result) {
+        const result = sourceNode.data.result;
+        // 배열인 경우
+        if (Array.isArray(result) && result.length > 0) {
+          const firstItem = result[0];
+          if (firstItem && typeof firstItem === 'object') {
+            Object.keys(firstItem).forEach(key => {
+              if (!columns.includes(key)) columns.push(key);
+            });
+          }
+        }
+        // 객체의 data 필드가 배열인 경우
+        else if (result.data && Array.isArray(result.data) && result.data.length > 0) {
+          const firstItem = result.data[0];
+          if (firstItem && typeof firstItem === 'object') {
+            Object.keys(firstItem).forEach(key => {
+              if (!columns.includes(key)) columns.push(key);
+            });
+          }
+        }
+      }
+    }
+
+    return columns;
+  }, [selectedNode.id, edges, nodes]);
 
   // 설정 값 변경 핸들러
   const handleConfigChange = (key: string, value: any) => {
@@ -57,6 +111,26 @@ export function NodeConfigPanel() {
             </select>
           );
         }
+        // 필드 선택이 필요한 경우 드롭다운 표시
+        if (FIELD_SELECT_KEYS.includes(key) && availableColumns.length > 0) {
+          return (
+            <div className="relative">
+              <select
+                value={value}
+                onChange={(e) => handleConfigChange(key, e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+              >
+                <option value="">필드 선택...</option>
+                {availableColumns.map((col) => (
+                  <option key={col} value={col}>
+                    {col}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          );
+        }
         if (key.toLowerCase().includes('prompt') || key.toLowerCase().includes('template')) {
           return (
             <textarea
@@ -66,6 +140,23 @@ export function NodeConfigPanel() {
               rows={4}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
+          );
+        }
+        // 필드 선택 키지만 컬럼이 없는 경우 - 힌트 표시
+        if (FIELD_SELECT_KEYS.includes(key)) {
+          return (
+            <div>
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => handleConfigChange(key, e.target.value)}
+                placeholder={schema.placeholder || ''}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-amber-600 mt-1">
+                💡 이전 노드를 먼저 연결하거나 실행하면 필드를 선택할 수 있습니다.
+              </p>
+            </div>
           );
         }
         return (
